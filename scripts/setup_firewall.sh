@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Open port 8000 for the Windows draft machine over the direct Ethernet link.
+# Open a TCP port for the Windows draft machine over the direct Ethernet link.
+# Usage: bash scripts/setup_firewall.sh [windows_ip] [port]
+# Example: bash scripts/setup_firewall.sh 192.168.50.2 8010
 set -euo pipefail
 
 WINDOWS_IP="${1:-192.168.50.2}"
-PORT="${2:-8000}"
+PORT="${2:-8010}"
 
 echo "Allowing TCP ${PORT} from ${WINDOWS_IP} ..."
 sudo firewall-cmd \

@@ -11,7 +11,7 @@ if (-not (Test-Path $python)) {
     Write-Error "venv not found. Run: powershell -ExecutionPolicy Bypass -File scripts\setup_windows.ps1"
 }
 
-$Verifier = "http://192.168.50.1:8000"
+$Verifier = "http://192.168.50.1:8010"
 $Prompt = "Explain speculative decoding in one short paragraph."
 $MaxNew = 128
 $BlockSize = 4

@@ -76,4 +76,4 @@ Write-Host "     powershell -ExecutionPolicy Bypass -File scripts\run_draft.ps1"
 Write-Host ""
 Write-Host "Or manually:"
 Write-Host "     cd $Root"
-Write-Host "     .\.venv\Scripts\python.exe draft\client.py --verifier http://192.168.50.1:8000"
+Write-Host '     .\.venv\Scripts\python.exe draft\client.py --verifier http://192.168.50.1:8010'

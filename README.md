@@ -31,10 +31,12 @@ This activates the `aisehack` conda env and installs PyTorch (CUDA), transformer
 ### 2. Open firewall for Windows
 
 ```bash
-bash scripts/setup_firewall.sh
+bash scripts/setup_firewall.sh 192.168.50.2 8010
 ```
 
-Allows TCP port `8000` from `192.168.50.2` only.
+Allows TCP port **8010** from `192.168.50.2` only.
+
+> **Note:** Port 8000 may be used by another local app (e.g. Praharī API on localhost). The speculative decoding verifier defaults to **8010**.
 
 ### 3. Start the verifier server
 
@@ -42,11 +44,17 @@ Allows TCP port `8000` from `192.168.50.2` only.
 bash scripts/start_verifier.sh
 ```
 
+Or explicitly on port 8010:
+
+```bash
+PORT=8010 bash scripts/start_verifier.sh
+```
+
 First run downloads ~1GB model weights from Hugging Face. Wait until you see:
 
 ```
 Verifier model ready.
-INFO:     Uvicorn running on http://0.0.0.0:8000
+INFO:     Uvicorn running on http://0.0.0.0:8010
 ```
 
 ### 4. Quick local test (on Fedora)
@@ -56,7 +64,7 @@ In another terminal:
 ```bash
 conda activate aisehack
 cd ~/Documents/CODING/AI/SpeculativeDecoding
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8010/health
 ```
 
 Expected: `{"status":"ok","model":"Qwen/Qwen2.5-1.5B-Instruct","device":"cuda"}`
@@ -83,7 +91,7 @@ Ethernet should be `192.168.50.2`. Fedora verifier must be running.
 
 ```powershell
 ping 192.168.50.1
-Invoke-RestMethod http://192.168.50.1:8000/health
+Invoke-RestMethod http://192.168.50.1:8010/health
 ```
 
 ### 3. Run speculative decoding
@@ -96,14 +104,14 @@ Or manually:
 
 ```powershell
 cd G:\SpeculativeDecoding_Kavin
-.\.venv\Scripts\python.exe draft\client.py --verifier http://192.168.50.1:8000
+.\.venv\Scripts\python.exe draft\client.py --verifier http://192.168.50.1:8010
 ```
 
 ### 4. Baseline comparison (optional)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\run_baseline.ps1
-.\.venv\Scripts\python.exe bench\compare.py --verifier http://192.168.50.1:8000
+.\.venv\Scripts\python.exe bench\compare.py --verifier http://192.168.50.1:8010
 ```
 
 ---
@@ -159,7 +167,8 @@ Compare speculative summary vs `bench/baseline.py` for speedup (may be &lt; 1x o
 
 | Problem | Fix |
 |---------|-----|
-| Windows can't reach `/health` | Fedora firewall: `bash scripts/setup_firewall.sh` |
+| Windows can't reach `/health` | Fedora firewall: `bash scripts/setup_firewall.sh 192.168.50.2 8010` |
+| Wrong service on port 8000 | Use **8010** — port 8000 may be another local app |
 | `CUDA out of memory` | Close other GPU apps; keep `--max-new-tokens 64` |
 | Windows RAM tight (8GB) | Close other apps before loading draft model |
 | Slow first run | Models downloading from Hugging Face — normal |

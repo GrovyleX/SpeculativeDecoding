@@ -7,13 +7,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+from shared.config import DEFAULT_BLOCK_SIZE, DEFAULT_MAX_NEW_TOKENS, DEFAULT_VERIFIER_URL
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compare speculative vs baseline")
-    parser.add_argument("--verifier", default="http://192.168.50.1:8000")
+    parser.add_argument("--verifier", default=DEFAULT_VERIFIER_URL)
     parser.add_argument("--prompt", default="Explain speculative decoding in one short paragraph.")
-    parser.add_argument("--max-new-tokens", type=int, default=128)
-    parser.add_argument("--block-size", type=int, default=4)
+    parser.add_argument("--max-new-tokens", type=int, default=DEFAULT_MAX_NEW_TOKENS)
+    parser.add_argument("--block-size", type=int, default=DEFAULT_BLOCK_SIZE)
     args = parser.parse_args()
 
     print(">>> Running baseline (verifier autoregressive)...")
