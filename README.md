@@ -63,104 +63,48 @@ Expected: `{"status":"ok","model":"Qwen/Qwen2.5-1.5B-Instruct","device":"cuda"}`
 
 ---
 
-## Windows setup (draft client) — detailed steps
+## Windows setup (draft client)
 
-Copy the **entire `SpeculativeDecoding` folder** to Windows (USB drive, `scp`, Git clone, or zip). Same project layout as Fedora.
+Uses **system Python 3** + a local `.venv` in this folder (no conda).
 
-### 1. Install Miniconda / Anaconda (if not installed)
+### 1. One-time setup
 
-Download from https://docs.anaconda.com/miniconda/ and install. Open **Anaconda Prompt** or PowerShell.
-
-### 2. Create the `aisehack` conda environment
+From `G:\SpeculativeDecoding_Kavin`:
 
 ```powershell
-conda create -n aisehack python=3.11 -y
-conda activate aisehack
+powershell -ExecutionPolicy Bypass -File scripts\setup_windows.ps1
 ```
 
-### 3. Install PyTorch with CUDA
+This creates `.venv\` here and installs PyTorch (CUDA) + project deps.
 
-Check your NVIDIA driver supports CUDA 12.x, then:
+### 2. Confirm network to Fedora
 
-```powershell
-pip install torch --index-url https://download.pytorch.org/whl/cu124
-```
-
-If CUDA install fails, try CPU-only (slower draft, but works for demo):
-
-```powershell
-pip install torch
-```
-
-### 4. Install project dependencies
-
-```powershell
-cd C:\path\to\SpeculativeDecoding
-pip install -r requirements.txt
-```
-
-### 5. Hugging Face login (optional but recommended)
-
-If model download is slow or gated:
-
-```powershell
-pip install huggingface_hub
-huggingface-cli login
-```
-
-Models used are public; login is optional.
-
-### 6. Confirm GPU (optional)
-
-```powershell
-python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu')"
-```
-
-### 7. Confirm network to Fedora
-
-With Ethernet configured as `192.168.50.2` and Fedora server running:
+Ethernet should be `192.168.50.2`. Fedora verifier must be running.
 
 ```powershell
 ping 192.168.50.1
-curl http://192.168.50.1:8000/health
-```
-
-PowerShell `curl` is an alias for `Invoke-WebRequest`. Alternative:
-
-```powershell
 Invoke-RestMethod http://192.168.50.1:8000/health
 ```
 
-### 8. Run speculative decoding
+### 3. Run speculative decoding
 
 ```powershell
-conda activate aisehack
-cd C:\path\to\SpeculativeDecoding
-
-python draft/client.py `
-  --verifier http://192.168.50.1:8000 `
-  --prompt "Explain speculative decoding in one short paragraph." `
-  --max-new-tokens 128 `
-  --block-size 4
+powershell -ExecutionPolicy Bypass -File scripts\run_draft.ps1
 ```
 
-First run downloads the 0.5B draft model (~400MB). Output includes per-block stats and a summary with acceptance rate and tok/s.
-
-### 9. Run baseline comparison (optional)
-
-From Windows, baseline hits Fedora verifier one token at a time (no draft model loaded):
+Or manually:
 
 ```powershell
-python bench/baseline.py --verifier http://192.168.50.1:8000
+cd G:\SpeculativeDecoding_Kavin
+.\.venv\Scripts\python.exe draft\client.py --verifier http://192.168.50.1:8000
 ```
 
-Or run both back-to-back:
+### 4. Baseline comparison (optional)
 
 ```powershell
-python bench/compare.py --verifier http://192.168.50.1:8000
+powershell -ExecutionPolicy Bypass -File scripts\run_baseline.ps1
+.\.venv\Scripts\python.exe bench\compare.py --verifier http://192.168.50.1:8000
 ```
-
-> **Note:** `compare.py` loads the draft model for the speculative half. Baseline only needs network + tokenizer.
 
 ---
 
