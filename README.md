@@ -8,12 +8,16 @@ Windows (draft)  ──Ethernet──►  Fedora (verifier)
   Wi‑Fi (internet)              Wi‑Fi (internet)
 ```
 
-## Models
+## Models (real speculative decoding)
 
 | Role | Model | Machine |
 |------|-------|---------|
-| Draft | `Qwen/Qwen2.5-0.5B-Instruct` (4-bit) | Windows |
-| Verifier | `Qwen/Qwen2.5-1.5B-Instruct` (4-bit) | Fedora |
+| Draft | `HuggingFaceTB/SmolLM2-360M-Instruct` (4-bit) | Windows |
+| Verifier | `HuggingFaceTB/SmolLM2-1.7B-Instruct` (4-bit) | Fedora |
+
+Same tokenizer family, different sizes — honest draft/target pair (not same-model cheat).
+
+Set `FAST_DEMO=1` only for demo mode (same model on both sides, ~100% acceptance).
 
 ---
 
@@ -26,17 +30,11 @@ cd ~/Documents/CODING/AI/SpeculativeDecoding
 bash scripts/setup_fedora.sh
 ```
 
-This activates the `aisehack` conda env and installs PyTorch (CUDA), transformers, bitsandbytes, FastAPI, etc.
-
 ### 2. Open firewall for Windows
 
 ```bash
 bash scripts/setup_firewall.sh 192.168.50.2 8010
 ```
-
-Allows TCP port **8010** from `192.168.50.2` only.
-
-> **Note:** Port 8000 may be used by another local app (e.g. Praharī API on localhost). The speculative decoding verifier defaults to **8010**.
 
 ### 3. Start the verifier server
 
@@ -44,53 +42,39 @@ Allows TCP port **8010** from `192.168.50.2` only.
 bash scripts/start_verifier.sh
 ```
 
-Or explicitly on port 8010:
-
-```bash
-PORT=8010 bash scripts/start_verifier.sh
-```
-
-First run downloads ~1GB model weights from Hugging Face. Wait until you see:
+Wait until you see:
 
 ```
 Verifier model ready.
 INFO:     Uvicorn running on http://0.0.0.0:8010
 ```
 
-### 4. Quick local test (on Fedora)
-
-In another terminal:
+### 4. Quick local test
 
 ```bash
-conda activate aisehack
-cd ~/Documents/CODING/AI/SpeculativeDecoding
 curl http://127.0.0.1:8010/health
 ```
 
-Expected: `{"status":"ok","model":"Qwen/Qwen2.5-1.5B-Instruct","device":"cuda"}`
+Expected: `"model":"HuggingFaceTB/SmolLM2-1.7B-Instruct"`, `"fast_demo":false`
 
 ---
 
 ## Windows setup (draft client)
 
-Uses **system Python 3** + a local `.venv` in this folder (no conda).
+Uses **system Python** + local `.venv` (no conda).
 
 ### 1. One-time setup
 
-From `G:\SpeculativeDecoding_Kavin`:
-
 ```powershell
+cd G:\SpeculativeDecoding_Kavin
 powershell -ExecutionPolicy Bypass -File scripts\setup_windows.ps1
 ```
 
-This creates `.venv\` here and installs PyTorch (CUDA) + project deps.
+Pull latest code from GitHub first if you cloned earlier.
 
-### 2. Confirm network to Fedora
-
-Ethernet should be `192.168.50.2`. Fedora verifier must be running.
+### 2. Confirm network
 
 ```powershell
-ping 192.168.50.1
 Invoke-RestMethod http://192.168.50.1:8010/health
 ```
 
@@ -100,66 +84,44 @@ Invoke-RestMethod http://192.168.50.1:8010/health
 powershell -ExecutionPolicy Bypass -File scripts\run_draft.ps1
 ```
 
-Or manually:
+Defaults: `FAST_DEMO=0`, `K=2`, `max-new-tokens=64`, draft=`SmolLM2-360M`.
+
+### 4. Baseline comparison
 
 ```powershell
-cd G:\SpeculativeDecoding_Kavin
-.\.venv\Scripts\python.exe draft\client.py --verifier http://192.168.50.1:8010
-```
-
-### 4. Baseline comparison (optional)
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\run_baseline.ps1
-.\.venv\Scripts\python.exe bench\compare.py --verifier http://192.168.50.1:8010
+powershell -ExecutionPolicy Bypass -File scripts\run_baseline.ps1 --max-new-tokens 64
+.\.venv\Scripts\python.exe bench\compare.py --verifier http://192.168.50.1:8010 --max-new-tokens 64 --block-size 2
 ```
 
 ---
 
-## API reference
+## Environment variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `FAST_DEMO` | `0` | `1` = same model demo; `0` = real SmolLM2 pair |
+| `VERIFIER_MODEL` | `SmolLM2-1.7B-Instruct` | Fedora target model |
+| `DRAFT_MODEL` | `SmolLM2-360M-Instruct` | Windows draft model |
+| `BLOCK_SIZE` | `2` | Draft tokens per block (try 2 or 4) |
+
+Legacy Qwen pair:
+
+```bash
+export VERIFIER_MODEL="Qwen/Qwen2.5-1.5B-Instruct"
+export DRAFT_MODEL="Qwen/Qwen2.5-0.5B-Instruct"
+export FAST_DEMO=0
+```
+
+---
+
+## API (session-based + KV cache)
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/health` | GET | Server + model status |
-| `/verify` | POST | Verify K draft tokens, return accepted count + next token |
-| `/next_token` | POST | Single autoregressive step (baseline) |
-
-### POST /verify
-
-```json
-{
-  "prompt_ids": [151644, 8948, ...],
-  "draft_ids": [1234, 5678, 9012, 3456]
-}
-```
-
-Response:
-
-```json
-{
-  "accepted": 3,
-  "next_token": 7890,
-  "verify_ms": 45.2
-}
-```
-
----
-
-## Blog metrics to capture
-
-The client prints per block:
-
-```
-block=1 K=4 accepted=3 draft_ms=12.0 network_ms=2.1 verify_ms=45.0
-```
-
-And a summary:
-
-- **Acceptance rate** — `total_accepted / total_drafted`
-- **Throughput** — tok/s
-- **Avg draft / network / verify ms** — per block
-
-Compare speculative summary vs `bench/baseline.py` for speedup (may be &lt; 1x on two laptops — document honestly).
+| `/health` | GET | Server status |
+| `/session/start` | POST | Start session with `prompt_ids` |
+| `/verify` | POST | Verify draft block (`session_id`, `draft_ids`) |
+| `/next_token` | POST | Baseline single step |
 
 ---
 
@@ -167,13 +129,11 @@ Compare speculative summary vs `bench/baseline.py` for speedup (may be &lt; 1x o
 
 | Problem | Fix |
 |---------|-----|
-| Windows can't reach `/health` | Fedora firewall: `bash scripts/setup_firewall.sh 192.168.50.2 8010` |
-| Wrong service on port 8000 | Use **8010** — port 8000 may be another local app |
-| `CUDA out of memory` | Close other GPU apps; keep `--max-new-tokens 64` |
-| Windows RAM tight (8GB) | Close other apps before loading draft model |
-| Slow first run | Models downloading from Hugging Face — normal |
-| Acceptance rate very low | Draft/verifier mismatch — both must be Qwen2.5 same family |
-| Connection timeout | Ensure Fedora `start_verifier.sh` is running |
+| Windows can't reach `/health` | `bash scripts/setup_firewall.sh 192.168.50.2 8010` |
+| Use port **8010** not 8000 | Port 8000 may be another local app |
+| Low acceptance | Normal for real SD; try `--block-size 2` |
+| CUDA OOM on Windows | Close other apps; 360M draft is ~400MB in 4-bit |
+| `fast_demo: true` in health | Set `FAST_DEMO=0` and restart verifier |
 
 ---
 
@@ -182,9 +142,8 @@ Compare speculative summary vs `bench/baseline.py` for speedup (may be &lt; 1x o
 ```
 SpeculativeDecoding/
 ├── shared/           # config + API schemas
-├── verifier/         # Fedora: model + FastAPI server
-├── draft/            # Windows: draft model + client loop
-├── bench/            # baseline + compare scripts
-├── scripts/          # Fedora setup/start helpers
-└── requirements.txt
+├── verifier/         # Fedora: SmolLM2-1.7B server
+├── draft/            # Windows: SmolLM2-360M client
+├── bench/            # baseline + compare
+└── scripts/
 ```

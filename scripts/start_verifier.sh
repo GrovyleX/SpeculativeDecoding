@@ -13,12 +13,13 @@ fi
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate aisehack
 
-export VERIFIER_MODEL="${VERIFIER_MODEL:-Qwen/Qwen2.5-1.5B-Instruct}"
+export VERIFIER_MODEL="${VERIFIER_MODEL:-HuggingFaceTB/SmolLM2-1.7B-Instruct}"
 export HOST="${HOST:-0.0.0.0}"
 export PORT="${PORT:-8010}"
-export FAST_DEMO="${FAST_DEMO:-1}"
+export FAST_DEMO="${FAST_DEMO:-0}"
 
 echo "Verifier model : $VERIFIER_MODEL"
+echo "FAST_DEMO      : $FAST_DEMO (0 = real SmolLM2 SD)"
 echo "Listening on   : ${HOST}:${PORT}"
 echo "Health check   : http://192.168.50.1:${PORT}/health"
 echo ""

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from shared.config import DEFAULT_MAX_NEW_TOKENS, DEFAULT_VERIFIER_URL, DRAFT_MODEL
+from shared.config import DEFAULT_MAX_NEW_TOKENS, DEFAULT_VERIFIER_URL, VERIFIER_MODEL
 from shared.protocol import NextTokenRequest, SessionStartRequest
 
 
@@ -33,7 +33,7 @@ def main() -> None:
     parser.add_argument("--max-new-tokens", type=int, default=DEFAULT_MAX_NEW_TOKENS)
     args = parser.parse_args()
 
-    tokenizer = AutoTokenizer.from_pretrained(DRAFT_MODEL)
+    tokenizer = AutoTokenizer.from_pretrained(VERIFIER_MODEL)
     output_ids = encode_prompt(tokenizer, args.prompt)
     start_len = len(output_ids)
     total_verify_ms = 0.0

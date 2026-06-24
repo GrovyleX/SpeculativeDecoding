@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from draft.model import DraftModel
-from shared.config import DEFAULT_BLOCK_SIZE, DEFAULT_MAX_NEW_TOKENS, DEFAULT_VERIFIER_URL, FAST_DEMO
+from shared.config import DEFAULT_BLOCK_SIZE, DEFAULT_MAX_NEW_TOKENS, DEFAULT_VERIFIER_URL, DRAFT_MODEL, FAST_DEMO
 from shared.protocol import SessionStartRequest, VerifyRequest, VerifyResponse
 
 
@@ -36,7 +36,7 @@ class RunStats:
 
     def summary(self, elapsed_s: float) -> str:
         tps = self.tokens_generated / elapsed_s if elapsed_s > 0 else 0.0
-        mode = "FAST_DEMO (same model)" if FAST_DEMO else "honest (0.5B draft)"
+        mode = "FAST_DEMO (same model)" if FAST_DEMO else f"real SD ({DRAFT_MODEL.split('/')[-1]} draft)"
         lines = [
             "",
             "=== Speculative run summary ===",

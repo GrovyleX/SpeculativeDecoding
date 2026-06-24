@@ -14,11 +14,11 @@ if (-not (Test-Path $python)) {
 $Verifier = "http://192.168.50.1:8010"
 $Prompt = "Explain speculative decoding in one short paragraph."
 $MaxNew = 64
-$BlockSize = 8
+$BlockSize = 2
 
-# FAST_DEMO=1 (default): same 1.5B draft+verifier, KV cache, ~100% acceptance
-# FAST_DEMO=0: honest 0.5B draft vs 1.5B verifier
-if (-not $env:FAST_DEMO) { $env:FAST_DEMO = "1" }
+# Real SD: SmolLM2-360M draft -> SmolLM2-1.7B verifier (FAST_DEMO=0)
+if (-not $env:FAST_DEMO) { $env:FAST_DEMO = "0" }
+if (-not $env:DRAFT_MODEL) { $env:DRAFT_MODEL = "HuggingFaceTB/SmolLM2-360M-Instruct" }
 
 for ($i = 0; $i -lt $args.Count; $i++) {
     switch ($args[$i]) {
@@ -30,6 +30,8 @@ for ($i = 0; $i -lt $args.Count; $i++) {
 }
 
 Write-Host "Verifier: $Verifier"
+Write-Host "Draft:    $env:DRAFT_MODEL"
+Write-Host "FAST_DEMO: $env:FAST_DEMO"
 Write-Host ""
 
 & $python (Join-Path $Root "draft\client.py") `
