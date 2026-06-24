@@ -22,7 +22,7 @@ class DraftModel:
 
         print(f"Loading draft model: {self.model_name} on {self.device} ...")
         if FAST_DEMO:
-            print("FAST_DEMO: draft matches verifier → expect ~100% acceptance (greedy)")
+            print("FAST_DEMO: draft matches verifier -> expect ~100% acceptance (greedy)")
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name,

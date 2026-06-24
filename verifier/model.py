@@ -105,7 +105,7 @@ class TargetModel:
         )
 
         print(f"Loading verifier model: {self.model_name} on {self.device} ...")
-        print(f"FAST_DEMO mode: {FAST_DEMO} (same-model draft → high acceptance)")
+        print(f"FAST_DEMO mode: {FAST_DEMO} (same-model draft -> high acceptance)")
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
