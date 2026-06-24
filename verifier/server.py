@@ -10,11 +10,13 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from shared.config import DEFAULT_PORT, VERIFIER_MODEL
+from shared.config import DEFAULT_PORT, FAST_DEMO, VERIFIER_MODEL
 from shared.protocol import (
     HealthResponse,
     NextTokenRequest,
     NextTokenResponse,
+    SessionStartRequest,
+    SessionStartResponse,
     VerifyRequest,
     VerifyResponse,
 )
@@ -42,18 +44,30 @@ def health() -> HealthResponse:
     return HealthResponse(
         status="ok",
         model=target.model_name,
-        device=target.device,
+        device=str(target.device),
+        fast_demo=FAST_DEMO,
+        sessions=len(target.sessions),
     )
+
+
+@app.post("/session/start", response_model=SessionStartResponse)
+def start_session(req: SessionStartRequest) -> SessionStartResponse:
+    if target is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    session_id = target.start_session(req.prompt_ids)
+    return SessionStartResponse(session_id=session_id)
 
 
 @app.post("/verify", response_model=VerifyResponse)
 def verify(req: VerifyRequest) -> VerifyResponse:
     if target is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
-    if not req.prompt_ids:
-        raise HTTPException(status_code=400, detail="prompt_ids must not be empty")
+    try:
+        session = target.get_session(req.session_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    accepted, next_token, verify_ms = target.verify(req.prompt_ids, req.draft_ids)
+    accepted, next_token, verify_ms = session.verify(req.draft_ids)
     return VerifyResponse(
         accepted=accepted,
         next_token=next_token,
@@ -65,10 +79,12 @@ def verify(req: VerifyRequest) -> VerifyResponse:
 def next_token(req: NextTokenRequest) -> NextTokenResponse:
     if target is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
-    if not req.prompt_ids:
-        raise HTTPException(status_code=400, detail="prompt_ids must not be empty")
+    try:
+        session = target.get_session(req.session_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    token, verify_ms = target.next_token(req.prompt_ids)
+    token, verify_ms = session.next_token()
     return NextTokenResponse(next_token=token, verify_ms=verify_ms)
 
 

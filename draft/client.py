@@ -13,8 +13,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from draft.model import DraftModel
-from shared.config import DEFAULT_BLOCK_SIZE, DEFAULT_MAX_NEW_TOKENS, DEFAULT_VERIFIER_URL
-from shared.protocol import VerifyRequest, VerifyResponse
+from shared.config import DEFAULT_BLOCK_SIZE, DEFAULT_MAX_NEW_TOKENS, DEFAULT_VERIFIER_URL, FAST_DEMO
+from shared.protocol import SessionStartRequest, VerifyRequest, VerifyResponse
 
 
 @dataclass
@@ -36,9 +36,11 @@ class RunStats:
 
     def summary(self, elapsed_s: float) -> str:
         tps = self.tokens_generated / elapsed_s if elapsed_s > 0 else 0.0
+        mode = "FAST_DEMO (same model)" if FAST_DEMO else "honest (0.5B draft)"
         lines = [
             "",
             "=== Speculative run summary ===",
+            f"Mode             : {mode}",
             f"Tokens generated : {self.tokens_generated}",
             f"Total time       : {elapsed_s:.2f}s",
             f"Throughput       : {tps:.2f} tok/s",
@@ -52,16 +54,19 @@ class RunStats:
         return "\n".join(lines)
 
 
-def wait_for_verifier(url: str, timeout_s: float = 300.0) -> None:
+def wait_for_verifier(http: requests.Session, url: str, timeout_s: float = 300.0) -> None:
     deadline = time.time() + timeout_s
     health_url = f"{url.rstrip('/')}/health"
     print(f"Waiting for verifier at {health_url} ...")
     while time.time() < deadline:
         try:
-            resp = requests.get(health_url, timeout=5)
+            resp = http.get(health_url, timeout=5)
             if resp.status_code == 200:
                 info = resp.json()
-                print(f"Verifier ready: {info['model']} on {info['device']}")
+                print(
+                    f"Verifier ready: {info['model']} on {info['device']} "
+                    f"(fast_demo={info.get('fast_demo', '?')})"
+                )
                 return
         except requests.RequestException:
             pass
@@ -69,8 +74,19 @@ def wait_for_verifier(url: str, timeout_s: float = 300.0) -> None:
     raise RuntimeError(f"Verifier not reachable at {url} after {timeout_s}s")
 
 
+def start_session(http: requests.Session, verifier_url: str, prompt_ids: list[int]) -> str:
+    resp = http.post(
+        f"{verifier_url.rstrip('/')}/session/start",
+        json=SessionStartRequest(prompt_ids=prompt_ids).model_dump(),
+        timeout=120,
+    )
+    resp.raise_for_status()
+    return resp.json()["session_id"]
+
+
 def speculative_generate(
     draft: DraftModel,
+    http: requests.Session,
     verifier_url: str,
     prompt: str,
     max_new_tokens: int,
@@ -81,13 +97,15 @@ def speculative_generate(
     stats = RunStats()
     t_start = time.perf_counter()
 
+    session_id = start_session(http, verifier_url, output_ids)
+
     while len(output_ids) - start_len < max_new_tokens:
         draft_ids, draft_ms = draft.draft_tokens(output_ids, block_size)
         stats.total_draft_ms += draft_ms
 
-        req = VerifyRequest(prompt_ids=output_ids, draft_ids=draft_ids)
+        req = VerifyRequest(session_id=session_id, draft_ids=draft_ids)
         t_net = time.perf_counter()
-        resp = requests.post(
+        resp = http.post(
             f"{verifier_url.rstrip('/')}/verify",
             json=req.model_dump(),
             timeout=120,
@@ -104,6 +122,7 @@ def speculative_generate(
 
         output_ids.extend(draft_ids[: result.accepted])
         output_ids.append(result.next_token)
+        draft.sync_after_verify(output_ids)
         stats.tokens_generated = len(output_ids) - start_len
 
         stats.block_log.append(
@@ -132,12 +151,14 @@ def main() -> None:
     parser.add_argument("--skip-wait", action="store_true", help="Do not wait for /health")
     args = parser.parse_args()
 
+    http = requests.Session()
     if not args.skip_wait:
-        wait_for_verifier(args.verifier)
+        wait_for_verifier(http, args.verifier)
 
     draft = DraftModel()
     output_ids, stats, elapsed = speculative_generate(
         draft=draft,
+        http=http,
         verifier_url=args.verifier,
         prompt=args.prompt,
         max_new_tokens=args.max_new_tokens,

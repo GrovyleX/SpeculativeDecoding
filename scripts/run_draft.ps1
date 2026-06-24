@@ -13,8 +13,12 @@ if (-not (Test-Path $python)) {
 
 $Verifier = "http://192.168.50.1:8010"
 $Prompt = "Explain speculative decoding in one short paragraph."
-$MaxNew = 128
-$BlockSize = 4
+$MaxNew = 64
+$BlockSize = 8
+
+# FAST_DEMO=1 (default): same 1.5B draft+verifier, KV cache, ~100% acceptance
+# FAST_DEMO=0: honest 0.5B draft vs 1.5B verifier
+if (-not $env:FAST_DEMO) { $env:FAST_DEMO = "1" }
 
 for ($i = 0; $i -lt $args.Count; $i++) {
     switch ($args[$i]) {
@@ -32,4 +36,5 @@ Write-Host ""
     --verifier $Verifier `
     --prompt $Prompt `
     --max-new-tokens $MaxNew `
-    --block-size $BlockSize
+    --block-size $BlockSize `
+    --skip-wait

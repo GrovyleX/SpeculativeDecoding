@@ -16,6 +16,7 @@ conda activate aisehack
 export VERIFIER_MODEL="${VERIFIER_MODEL:-Qwen/Qwen2.5-1.5B-Instruct}"
 export HOST="${HOST:-0.0.0.0}"
 export PORT="${PORT:-8010}"
+export FAST_DEMO="${FAST_DEMO:-1}"
 
 echo "Verifier model : $VERIFIER_MODEL"
 echo "Listening on   : ${HOST}:${PORT}"

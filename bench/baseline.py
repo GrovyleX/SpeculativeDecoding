@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from shared.config import DEFAULT_MAX_NEW_TOKENS, DEFAULT_VERIFIER_URL, DRAFT_MODEL
-from shared.protocol import NextTokenRequest
+from shared.protocol import NextTokenRequest, SessionStartRequest
 
 
 def encode_prompt(tokenizer: AutoTokenizer, prompt: str) -> list[int]:
@@ -39,10 +39,20 @@ def main() -> None:
     total_verify_ms = 0.0
     t_start = time.perf_counter()
 
+    http = requests.Session()
+    base = args.verifier.rstrip("/")
+    session_resp = http.post(
+        f"{base}/session/start",
+        json=SessionStartRequest(prompt_ids=output_ids).model_dump(),
+        timeout=120,
+    )
+    session_resp.raise_for_status()
+    session_id = session_resp.json()["session_id"]
+
     while len(output_ids) - start_len < args.max_new_tokens:
-        req = NextTokenRequest(prompt_ids=output_ids)
-        resp = requests.post(
-            f"{args.verifier.rstrip('/')}/next_token",
+        req = NextTokenRequest(session_id=session_id)
+        resp = http.post(
+            f"{base}/next_token",
             json=req.model_dump(),
             timeout=120,
         )
