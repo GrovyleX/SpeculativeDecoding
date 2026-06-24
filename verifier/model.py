@@ -16,6 +16,7 @@ class VerifierSession:
         self.device = device
         self.token_ids: list[int] = list(prompt_ids)
         self.past_key_values = None
+        self._next_token_logits: torch.Tensor | None = None
         self._prefill(prompt_ids)
 
     def _prefill(self, prompt_ids: list[int]) -> None:
@@ -23,8 +24,10 @@ class VerifierSession:
         with torch.inference_mode():
             outputs = self.model(input_ids, use_cache=True)
         self.past_key_values = outputs.past_key_values
+        self._next_token_logits = outputs.logits[0, -1]
 
     def _crop_cache(self, length: int) -> None:
+        self.token_ids = self.token_ids[:length]
         if self.past_key_values is not None and hasattr(self.past_key_values, "crop"):
             self.past_key_values.crop(length)
 
@@ -40,51 +43,39 @@ class VerifierSession:
             )
         self.past_key_values = outputs.past_key_values
         self.token_ids.extend(token_ids)
+        self._next_token_logits = outputs.logits[0, -1]
 
     def verify(self, draft_ids: list[int]) -> tuple[int, int, float]:
+        """
+        Greedy speculative verification with correct next-token logits.
+
+        logits[t] predicts the token *after* position t, so each draft token
+        is checked against _next_token_logits before advancing the cache.
+        """
         t0 = time.perf_counter()
-        input_ids = torch.tensor([draft_ids], device=self.device)
+        accepted = 0
 
-        with torch.inference_mode():
-            outputs = self.model(
-                input_ids,
-                past_key_values=self.past_key_values,
-                use_cache=True,
-            )
-
-        logits = outputs.logits[0]
-        prefix_len = len(self.token_ids)
-
-        for i, draft_token in enumerate(draft_ids):
-            predicted = int(logits[i].argmax().item())
+        for draft_token in draft_ids:
+            if self._next_token_logits is None:
+                raise RuntimeError("session logits not initialized")
+            predicted = int(self._next_token_logits.argmax().item())
             if predicted != draft_token:
-                self._crop_cache(prefix_len + i)
-                self.token_ids.extend(draft_ids[:i])
                 self._append_tokens([predicted])
                 verify_ms = (time.perf_counter() - t0) * 1000
-                return i, predicted, verify_ms
+                return accepted, predicted, verify_ms
+            self._append_tokens([draft_token])
+            accepted += 1
 
-        next_token = int(logits[-1].argmax().item())
-        self.past_key_values = outputs.past_key_values
-        self.token_ids.extend(draft_ids)
+        next_token = int(self._next_token_logits.argmax().item())
         self._append_tokens([next_token])
-
         verify_ms = (time.perf_counter() - t0) * 1000
-        return len(draft_ids), next_token, verify_ms
+        return accepted, next_token, verify_ms
 
     def next_token(self) -> tuple[int, float]:
         t0 = time.perf_counter()
-        self._crop_cache(len(self.token_ids) - 1)
-        last_token = self.token_ids[-1]
-        input_ids = torch.tensor([[last_token]], device=self.device)
-        with torch.inference_mode():
-            outputs = self.model(
-                input_ids,
-                past_key_values=self.past_key_values,
-                use_cache=True,
-            )
-        token = int(outputs.logits[0, -1].argmax().item())
-        self.past_key_values = outputs.past_key_values
+        if self._next_token_logits is None:
+            raise RuntimeError("session logits not initialized")
+        token = int(self._next_token_logits.argmax().item())
         self._append_tokens([token])
         verify_ms = (time.perf_counter() - t0) * 1000
         return token, verify_ms

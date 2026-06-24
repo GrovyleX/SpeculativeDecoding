@@ -68,7 +68,7 @@ def main() -> None:
     tps = tokens / elapsed if elapsed > 0 else 0.0
 
     print("\n=== Generated text (baseline) ===")
-    print(tokenizer.decode(output_ids, skip_special_tokens=True))
+    print(tokenizer.decode(output_ids[start_len:], skip_special_tokens=True))
     print("\n=== Baseline summary ===")
     print(f"Tokens generated : {tokens}")
     print(f"Total time       : {elapsed:.2f}s")

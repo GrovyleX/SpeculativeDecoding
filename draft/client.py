@@ -165,7 +165,8 @@ def main() -> None:
         block_size=args.block_size,
     )
 
-    text = draft.decode(output_ids)
+    start_len = len(draft.encode_prompt(args.prompt))
+    text = draft.decode(output_ids[start_len:])
     print("\n=== Generated text ===")
     print(text)
     print(stats.summary(elapsed))
