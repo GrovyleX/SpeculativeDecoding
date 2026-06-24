@@ -105,7 +105,7 @@ class TargetModel:
         )
 
         print(f"Loading verifier model: {self.model_name} on {self.device} ...")
-        print(f"FAST_DEMO mode: {FAST_DEMO} (0 = SmolLM2-360M draft → {self.model_name.split('/')[-1]})")
+        print(f"FAST_DEMO mode: {FAST_DEMO} (0 = SmolLM2-360M draft -> {self.model_name.split('/')[-1]})")
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
